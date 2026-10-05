@@ -60,18 +60,18 @@ the web server.
 2. Set `lora_serial` to the board. It's listed as
    `/dev/serial/by-id/usb-Silicon_Labs_CP2102...`. Use the `by-id` path, not
    `/dev/ttyUSB0`, so the setting survives reboots and other USB devices.
-3. Add the mower to `/data/mammotion-rc/mowers.toml`. Onboarding's network
-   scan can't find LoRa mowers:
+3. Set `lora_mower` to the mower's Mammotion device name (e.g.
+   `Luba-XXXXXXXX`, as shown in the Mammotion app's device info). The add-on
+   writes its `mowers.toml` entry (`127.0.0.1:9876`, `link = "lora"`) on
+   start, and keeps any other mowers already listed. Onboarding's network scan
+   can't find LoRa mowers, so this replaces it.
+4. Save and restart the add-on. The log shows `mowers.toml: added LoRa mower
+   ...` and `Starting LoRa bridge on ...`, followed by `base: mammotion-rc
+   v3-base ...` once the board answers.
 
-   ```toml
-   [[mower]]
-   name      = "Luba-XXXXXXXX"
-   hc33_host = "127.0.0.1"
-   hc33_port = 9876
-   link      = "lora"
-   ```
-4. Restart the add-on. The log shows `Starting LoRa bridge on ...`, followed by
-   `base: mammotion-rc v3-base ...` once the board answers.
+With a mower configured this way, the web UI skips onboarding and the
+Mammotion account login. Driving doesn't need the login; only the camera does,
+and the camera doesn't work over LoRa anyway.
 
 The Home Assistant machine is now one end of the radio link, so it has to be
 within LoRa range of the mower. A USB extension cable lets you put the base

@@ -29,9 +29,34 @@ fi
 
 echo "[3/4] Checking LoRa bridge..."
 
-LORA_SERIAL=""
-if [ -f "$OPTIONS" ]; then
-    LORA_SERIAL="$(python -c 'import json,sys; print(json.load(open(sys.argv[1])).get("lora_serial") or "")' "$OPTIONS")"
+opt() {
+    [ -f "$OPTIONS" ] || return 0
+    python -c 'import json,sys; print((json.load(open(sys.argv[1])).get(sys.argv[2]) or "").strip())' "$OPTIONS" "$1"
+}
+LORA_SERIAL="$(opt lora_serial)"
+LORA_MOWER="$(opt lora_mower)"
+
+if [ -n "$LORA_MOWER" ]; then
+    # Upsert the LoRa mower into mowers.toml, keeping any other mowers and
+    # this one's nickname / iot_id.  Uses the web server's own TOML writer.
+    python - "$LORA_MOWER" <<'PY'
+import sys
+import persist
+
+name = sys.argv[1]
+mowers = persist.load_mowers()
+want = {"hc33_host": "127.0.0.1", "hc33_port": 9876, "link": "lora"}
+cur = next((m for m in mowers if m["name"] == name), None)
+if cur is None:
+    mowers.append({"name": name, "nickname": None, "iot_id": None, **want})
+    print(f"mowers.toml: added LoRa mower {name}")
+elif any(cur.get(k) != v for k, v in want.items()):
+    cur.update(want)
+    print(f"mowers.toml: pointed {name} at the LoRa bridge")
+else:
+    sys.exit(0)
+persist.save_mowers(mowers)
+PY
 fi
 
 if [ -n "$LORA_SERIAL" ]; then
