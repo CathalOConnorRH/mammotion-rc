@@ -1,0 +1,7 @@
+# Source the add-on image clones at build time.  The LoRa variant
+# (web-server/lora_bridge.py, mowers.toml `link = "lora"`) lives on this fork
+# branch until it's merged upstream; point these back at
+# ontheview/mammotion-rc + main after that.
+args:
+  SOURCE_REPO: CathalOConnorRH/mammotion-rc
+  SOURCE_REF: lora-v3

@@ -1,6 +1,6 @@
 name: "Mammotion Remote"
-description: "Home Assistant add-on for mammotion-rc with HC33 camera support"
-version: "1.0.0"
+description: "Home Assistant add-on for mammotion-rc (HC33 Wi-Fi/HaLow or Heltec V3 LoRa)"
+version: "1.1.0"
 slug: "mammotion_remote"
 url: "https://github.com/ontheview/mammotion-rc"
 startup: application
@@ -9,8 +9,18 @@ init: false
 
 arch:
   - amd64
+  - aarch64
 
 host_network: true
 
-watchdog: "tcp://[HOST]:8443"
+# Serial access for the Heltec V3 LoRa base board (USB, CP2102).
+uart: true
 
+options:
+  lora_serial: null
+schema:
+  # Leave empty for HC33 (Wi-Fi/HaLow) mowers.  For the LoRa variant, pick the
+  # base board, e.g. /dev/serial/by-id/usb-Silicon_Labs_CP2102_...
+  lora_serial: "device(subsystem=tty)?"
+
+watchdog: "tcp://[HOST]:8443"
