@@ -16,6 +16,9 @@
 #                 Find it via PyMammotion's dev_console.py after cloud login:
 #                     >>> [(d.device_name, d.iot_id) for d in devices]
 #                 Omit this field to disable the camera button for that mower.
+#   link        — "lora" for a mower reached through lora_bridge.py and the
+#                 Heltec V3 LoRa boards.  Slows the UI's joystick repeat and
+#                 polling to fit the radio link.  Omit for WiFi/HaLow HC33s.
 
 [[mower]]
 name      = "Luba-XXXXXXXX"
@@ -28,3 +31,12 @@ iot_id    = "YOUR_IOT_ID"
 # [[mower]]
 # name      = "Luba-OTHER"
 # hc33_host = "192.168.1.55"
+#
+# Example LoRa mower (run `python lora_bridge.py --serial <port>` alongside the
+# server; onboarding discovery can't find LoRa mowers, so add them by hand):
+#
+# [[mower]]
+# name      = "Luba-LORA"
+# hc33_host = "127.0.0.1"
+# hc33_port = 9876
+# link      = "lora"

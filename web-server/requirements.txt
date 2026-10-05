@@ -15,6 +15,9 @@ packaging
 fastapi>=0.115,<1
 uvicorn[standard]>=0.30,<1
 
+# lora_bridge.py (Heltec V3 LoRa variant) talks to the base board over USB serial.
+pyserial-asyncio>=0.6
+
 # OPTIONAL — intentionally NOT installed by default.
 #
 # netifaces gives accurate per-interface broadcast addresses for proxy

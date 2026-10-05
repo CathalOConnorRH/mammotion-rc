@@ -86,6 +86,19 @@ let headingTimer = null;   // setInterval handle for the compass heading poll
 let joyTimer = null;       // setInterval re-sending the held joystick state (keeps the mower moving)
 let joyState = { x: 0, y: 0, force: 0 };  // latest stick command, re-sent by joyTimer while held
 
+// Per-link UI pacing.  A LoRa mower (mowers.toml link = "lora") sits behind a
+// ~22 kbps half-duplex radio where every joystick frame is an encrypted,
+// ACKed round trip, so it gets a slower joystick heartbeat and lazier polls.
+// WiFi/HaLow mowers keep the original rates.
+const LINK_TIMING = {
+  default: { joyRepeatMs: 150, headingMs: 1000, statusMs: 3000 },
+  lora:    { joyRepeatMs: 400, headingMs: 3000, statusMs: 10000 },
+};
+function linkTiming(name) {
+  const meta = mowersList.find(m => m.name === name);
+  return LINK_TIMING[meta && meta.link] || LINK_TIMING.default;
+}
+
 // Fixed correction applied to the mower's reported heading before it drives the
 // compass. Leave 0 unless the compass reads offset from reality (e.g. if the
 // firmware's heading is magnetic or grid-relative rather than true north); then
@@ -119,7 +132,7 @@ function startCompass(name) {
   if (headingTimer) clearInterval(headingTimer);
   els.compass.hidden = false;
   pollHeading(name);                                     // paint immediately
-  headingTimer = setInterval(() => pollHeading(name), 1000);
+  headingTimer = setInterval(() => pollHeading(name), linkTiming(name).headingMs);
 }
 
 function stopCompass() {
@@ -261,7 +274,7 @@ async function pollStatus(name) {
 
 function startStatusPolling(name) {
   if (statusTimer) clearInterval(statusTimer);
-  statusTimer = setInterval(() => pollStatus(name), 3000);
+  statusTimer = setInterval(() => pollStatus(name), linkTiming(name).statusMs);
 }
 
 els.reconnect.onclick = () => {
@@ -302,8 +315,9 @@ function startJoystick(name) {
   // silent and the mower would halt ("hold it up and it stops").  Fix: latch the
   // current stick state and RE-SEND it on an interval while held.  REPEAT_MS must
   // be shorter than the mower's per-command window; 150 ms (~6.5 Hz) is the rate
-  // that already sustained motion during active drags.
-  const REPEAT_MS = 150;   // ~6.5 Hz
+  // that already sustained motion during active drags.  LoRa mowers use 400 ms
+  // (see LINK_TIMING) to fit the radio's airtime.
+  const REPEAT_MS = linkTiming(name).joyRepeatMs;
 
   joystick.on("move", (_evt, data) => {
     // nipplejs's data.vector has y positive UP (it negates internally).

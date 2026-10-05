@@ -11,6 +11,7 @@ mowers.toml   — roster, safe to commit:
     hc33_host = "192.168.1.54"
     hc33_port = 9876
     iot_id    = "YOUR_IOT_ID"   # optional
+    link      = "lora"          # optional; "lora" = via lora_bridge.py (slower UI polling)
 
 secrets.toml  — Mammotion account creds, MUST stay out of git:
     email    = "you@example.com"
@@ -71,6 +72,7 @@ def load_mowers() -> list[dict]:
             "hc33_host": m["hc33_host"],
             "hc33_port": int(m.get("hc33_port", 9876)),
             "iot_id":    m.get("iot_id") or None,
+            "link":      m.get("link") or None,
         })
     return out
 
@@ -91,6 +93,8 @@ def save_mowers(mowers: list[dict]) -> None:
         lines.append(f"hc33_port = {int(m.get('hc33_port', 9876))}")
         if m.get("iot_id"):
             lines.append(f"iot_id    = {_toml_quote(m['iot_id'])}")
+        if m.get("link"):
+            lines.append(f"link      = {_toml_quote(m['link'])}")
         lines.append("")
     _atomic_write(MOWERS_PATH, "\n".join(lines))
 

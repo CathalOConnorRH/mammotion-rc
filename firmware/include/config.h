@@ -125,3 +125,52 @@
 #define UUID_SERVICE                "0000ffff-0000-1000-8000-00805f9b34fb"
 #define UUID_WRITE_CHARACTERISTIC   "0000ff01-0000-1000-8000-00805f9b34fb"
 #define UUID_NOTIFY_CHARACTERISTIC  "0000ff02-0000-1000-8000-00805f9b34fb"
+
+// ── LoRa variant (env:v3-mower / env:v3-base, Heltec WiFi LoRa 32 V3) ─────────
+// Ignored by the HC33 builds.  See docs/lora-v3-plan.md and lora_link.h.
+//
+// SX1262 wiring on the Heltec V3 (fixed on the PCB).
+#define LORA_PIN_NSS    8
+#define LORA_PIN_SCK    9
+#define LORA_PIN_MOSI   10
+#define LORA_PIN_MISO   11
+#define LORA_PIN_RST    12
+#define LORA_PIN_BUSY   13
+#define LORA_PIN_DIO1   14
+#define LORA_TCXO_V     1.8f    // V3 SX1262 runs off a 1.8 V TCXO
+
+// Radio settings — both boards MUST match.  920 MHz sits inside both the AU
+// (915–928) and US (902–928) ISM bands.  AU allows up to 1 W EIRP here, so
+// +22 dBm (the SX1262 max) plus a ~3 dBi antenna is legal.  If range is short,
+// drop to SF8 / BW250 (roughly double the airtime, ~+5 dB link budget).
+#define LORA_FREQ_MHZ   920.0f
+#define LORA_BW_KHZ     500.0f
+#define LORA_SF         7
+#define LORA_CR         5       // coding rate 4/5
+#define LORA_TX_DBM     22
+#define LORA_PREAMBLE   8
+#define LORA_SYNC_WORD  0x12    // SX126x "private" sync word
+
+// Link layer.  Frames up to MAX_FRAME_LEN are split into LORA_FRAG_MAX-byte
+// chunks; each chunk is stop-and-wait ACKed and retried up to LORA_MAX_RETRIES
+// times.  The ACK timeout is computed from the actual time-on-air plus
+// LORA_ACK_MARGIN_MS (covers the peer's turnaround) plus random jitter so two
+// boards that collided don't retry in lockstep.
+#define LORA_FRAG_MAX       200
+#define LORA_MAX_RETRIES    5
+#define LORA_ACK_MARGIN_MS  40
+#define LORA_TX_QUEUE_MAX   32      // outbound messages; overflow = link failure, never a silent drop
+
+// Mower dead-man: drop BLE if no frame from the PC (DATA_TX / OPEN) has
+// arrived over LoRa in this long.  Mirrors CLIENT_IDLE_TIMEOUT_MS — PyMammotion
+// heartbeats every 20 s while the session is alive.
+#define LINK_IDLE_TIMEOUT_MS  CLIENT_IDLE_TIMEOUT_MS
+
+// Base board: USB serial to lora_bridge.py.  Logs share the same UART; the
+// bridge resyncs on the frame magic and prints everything else as log text.
+#define LORA_SERIAL_BAUD        921600
+#define LORA_STATS_INTERVAL_MS  5000    // base → PC link-quality report period
+
+// The AES-128-GCM pre-shared key lives in include/lora_key.h (gitignored) —
+// copy include/lora_key.h.example and generate a fresh key.  Both boards must
+// be flashed with the same key.

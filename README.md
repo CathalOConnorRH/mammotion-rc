@@ -12,7 +12,7 @@ Bluetooth-over-network proxy, and PyMammotion driving it from a web page.
 
 | Path | What it is |
 |---|---|
-| `firmware/` | HC33 firmware — BLE-over-network proxy + Wi-Fi HaLow bridge. See [`firmware/README.md`](firmware/README.md). |
+| `firmware/` | HC33 firmware — BLE-over-network proxy + Wi-Fi HaLow bridge. Also the Heltec V3 LoRa variant (`env:v3-mower` / `env:v3-base`). See [`firmware/README.md`](firmware/README.md). |
 | `web-server/` | FastAPI control server + browser UI (joystick, camera, status). See [`web-server/README.md`](web-server/README.md). |
 | `firmware/flasher/` | Browser-based (Web Serial) firmware flasher. |
 | `docs/` | Engineering notes (HaLow, NAPT, SDK migration). |
@@ -221,6 +221,71 @@ You lose only the HaLow long-range uplink and the mower-facing softAP — you'd
 reach the device over your normal Wi-Fi instead. Full details (partition sizing,
 flash flags, NimBLE version) are in
 [**firmware/README.md → Other ESP32 boards**](firmware/README.md#other-esp32-boards-the-standard-wifi-build).
+
+## LoRa variant (2× Heltec WiFi LoRa 32 V3) — experimental
+
+For properties beyond Wi-Fi/HaLow reach, the mower's Bluetooth link can run over
+915 MHz LoRa instead. It needs two **Heltec WiFi LoRa 32 V3** boards
+(ESP32-S3 + SX1262):
+
+```
+web-server ─TCP 127.0.0.1:9876─► lora_bridge.py ─USB─► V3 "base" ~~ LoRa ~~ V3 "mower" ─BLE─► mower
+```
+
+- The **mower** board rides on the mower and acts as the nearby "phone" over
+  Bluetooth (the same BLE code as the HC33).
+- The **base** board plugs into the PC running the web server.
+  `web-server/lora_bridge.py` makes it look like an HC33, so the rest of the
+  server is unchanged.
+- Every radio packet is encrypted and authenticated with AES-128-GCM under a
+  pre-shared key, and replays are rejected. Without the key, nobody can drive
+  your mower. Lost packets are ACKed and retried.
+- **The camera doesn't work over LoRa.** Video goes from the mower's own Wi-Fi
+  to the cloud, which LoRa can't carry. You get control and status only.
+
+**Antennas:** never power a V3 without its antenna connected. Transmitting
+into no load can damage the radio.
+
+**Power rules:** the default is 920 MHz at +22 dBm, the SX1262 maximum. That's
+inside the AU 915–928 MHz band, where up to 1 W EIRP is allowed, and the US
+902–928 MHz band. Other regions: change `LORA_FREQ_MHZ` / `LORA_TX_DBM` in
+`firmware/include/config.h` to suit your local rules.
+
+**Setup:**
+
+1. Create the shared key. Both boards must be built with the same file:
+   ```
+   cp firmware/include/lora_key.h.example firmware/include/lora_key.h
+   python -c "import os;print(', '.join(f'0x{b:02x}' for b in os.urandom(16)))"
+   ```
+   Paste the 16 bytes into `lora_key.h`. The file is gitignored, so treat it
+   like a password.
+2. Flash both boards: `pio run -e v3-mower -t upload` and
+   `pio run -e v3-base -t upload`.
+3. Install the bridge dependency with `pip install pyserial-asyncio` (it's in
+   `requirements.txt`), then bench-test the link:
+   ```
+   python web-server/lora_bridge.py --serial <base port> --test 50 --size 600
+   ```
+   This prints round-trip times and the signal strength each board sees. For a
+   range walk, use `--test 0 --interval 2`.
+4. Run the bridge next to the web server with
+   `python web-server/lora_bridge.py --serial <base port>`.
+5. Add the mower to `web-server/mowers.toml` by hand. Onboarding's network scan
+   can't find a LoRa mower:
+   ```toml
+   [[mower]]
+   name      = "Luba-XXXXXXXX"
+   hc33_host = "127.0.0.1"
+   hc33_port = 9876
+   link      = "lora"
+   ```
+   `link = "lora"` slows the UI to suit the radio: joystick repeat 400 ms,
+   status poll 10 s, heading poll 3 s.
+
+**Safety stop:** if the mower board hears nothing from the PC for 30 s, it
+drops Bluetooth, the same as the HC33. Releasing the joystick still sends an
+immediate stop.
 
 ## Acknowledgements
 

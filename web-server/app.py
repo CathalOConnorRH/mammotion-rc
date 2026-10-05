@@ -140,6 +140,12 @@ async def _auto_reconnect(name: str) -> None:
         state.auto_retrying[name] = False
 
 
+def _is_lora(name: str) -> bool:
+    """True for a mower reached through lora_bridge.py (mowers.toml link = "lora")."""
+    cfg = next((m for m in MOWERS if m["name"] == name), None)
+    return bool(cfg and cfg.get("link") == "lora")
+
+
 async def _watchdog(name: str) -> None:
     """Watch one transport for unexpected drops and fire the retry sequence.
 
@@ -171,9 +177,11 @@ async def _watchdog(name: str) -> None:
             # auto-offs the light after a while and only a get_car_light response
             # updates lamp_info, so we actively re-probe; the answer lands async
             # and /api/status serves it on the next poll.  Piggybacking the 2 s
-            # watchdog tick avoids a second timer.
+            # watchdog tick avoids a second timer.  LoRa mowers probe every ~20 s
+            # instead: each probe is a round trip on a slow half-duplex radio.
             ticks += 1
-            if current == TransportAvailability.CONNECTED and ticks % 3 == 0:
+            light_every = 10 if _is_lora(name) else 3
+            if current == TransportAvailability.CONNECTED and ticks % light_every == 0:
                 h = state.handles.get(name)
                 if h is not None:
                     with contextlib.suppress(Exception):
@@ -599,7 +607,8 @@ async def _ensure_http() -> MammotionHTTP:
 @app.get("/api/mowers")
 async def list_mowers():
     return [
-        {"name": m["name"], "nickname": m.get("nickname"), "camera": m["iot_id"] is not None}
+        {"name": m["name"], "nickname": m.get("nickname"), "camera": m["iot_id"] is not None,
+         "link": m.get("link")}
         for m in MOWERS
     ]
 
@@ -1168,6 +1177,9 @@ async def onboard_save(payload: dict = Body(...)):
     Credentials fall back to the ones captured at /api/onboard/login.
     """
     rows = payload.get("mowers") or []
+    # The onboarding UI has no field for `link` (LoRa mowers are hand-added),
+    # so carry it over from the current roster when name + host are unchanged.
+    prev_link = {(m["name"], m["hc33_host"]): m.get("link") for m in MOWERS}
     norm: list[dict] = []
     for m in rows:
         name = (m.get("name") or "").strip()
@@ -1180,6 +1192,7 @@ async def onboard_save(payload: dict = Body(...)):
             "hc33_host": host,
             "hc33_port": int(m.get("hc33_port") or 9876),
             "iot_id":    (m.get("iot_id") or None),
+            "link":      (m.get("link") or prev_link.get((name, host))),
         })
     if not norm:
         raise HTTPException(400, "no mowers to save")

@@ -1,0 +1,10 @@
+// Copy to include/lora_key.h (gitignored) and replace the bytes with a fresh
+// random key.  Both V3 boards must be built with the same file.
+//
+// Generate one with:
+//   python -c "import os;print(', '.join(f'0x{b:02x}' for b in os.urandom(16)))"
+//
+// Anyone holding this key can drive the mower — treat it like a password.
+#pragma once
+#define LORA_PSK { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
+                   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }
